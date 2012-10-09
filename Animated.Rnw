@@ -1,0 +1,150 @@
+\documentclass{article}
+\usepackage{animate}
+\usepackage{titling}
+\definecolor{myred}{RGB}{153, 0, 13}
+\usepackage[bookmarks, colorlinks=true, 
+            linkcolor=myred, urlcolor=myred]{hyperref}
+\setlength{\droptitle}{-4em}
+\addtolength{\droptitle}{-4pt}
+\usepackage[letterpaper]{geometry}
+\geometry{left=1.45in, right=1.45in, 
+          top=1.15in, bottom=1.15in}
+
+\title{Animated Plots with \texttt{knitr}}
+\author{Samuel M. Jenness \\
+        \href{mailto:sjenness@uw.edu}{\texttt{sjenness@uw.edu}}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+<<setup, include=FALSE>>=
+opts_chunk$set(dev='pdf', fig.align='center', 
+               cache=FALSE, message=FALSE, fig.width=5, fig.height=5, 
+               fig.pos='h!', par=TRUE, tidy=FALSE, out.width='.8\\linewidth')
+options(replace.assign=TRUE,width=70)
+library(RColorBrewer)
+source('/Users/SMJ/Dropbox/R/Robust.R')
+pal <- transco(brewer.pal(3, 'Set1'), 0.6)
+library(arm)
+library(statnet)
+@
+
+\noindent \texttt{knitr} is an update to \texttt{Sweave}, which is software that integrates data analysis in \texttt{R} and word-processing in \LaTeX. One nice feature of \texttt{knitr} is easy animated plots. Rstudio can directly evaluate and compile \texttt{knitr} documents with one click. This provides three examples. \textbf{Note: you must open this PDF in Adobe Acrobat to see the animations.}
+
+\section{Linear Regression}
+
+This defines the values of $x$ and $y$, estimates the coefficents in a linear regression model, and simulates coefficients given the model using Gelman's \texttt{sim} function in the \texttt{arm} package. This is a nice way to see inferential uncertainty in the coefficients.
+
+<<reg, message=FALSE>>=
+x <- 1:100
+y <- 5*x + rnorm(length(x), 0, 200)
+mod <- lm(y ~ x)
+mod.sim <- sim(mod, n.sims=250)
+b <- coef(mod.sim)
+@
+
+An animated plot is constructed like this, with everything is wrapped in a loop. I used the multiple lines of code for the curve function to create a fade-out effect. The animation options (not shown here) are: a  frame rate of 10 frames per second, automatically play upon opening the PDF, and loop the animation.
+
+<<figreg, fig.show='animate', interval=0.15, aniopts='controls,autoplay,loop'>>=
+for (i in 5:nrow(b)) {
+    plot(x, y, pch = 20, cex=0.5,
+         xlim=c(0,max(x)), ylim=range(y), col=pal[2])
+    curve(b[i-4,1] + b[i-4,2]*x, lwd=2, add=T, col='grey80')
+    curve(b[i-3,1] + b[i-3,2]*x, lwd=2, add=T, col='grey60')
+    curve(b[i-2,1] + b[i-2,2]*x, lwd=2, add=T, col='grey40')
+    curve(b[i-1,1] + b[i-1,2]*x, lwd=2, add=T, col='grey20')
+    curve(b[i,1] + b[i,2]*x, lwd=2, add=T)
+}
+@
+\bigskip
+
+\section{Network Simulation}
+
+Here is the flomarriage network estimated and simulated, using code featured in the ERGM workshop.
+
+<<setup2, message=FALSE, results='hide', fig.show='hold'>>=
+data(florentine)
+wealth <- flomarriage %v% 'wealth'
+flomodel.03 <- ergm(flomarriage~edges+nodecov('wealth'))
+flomodel.03.sim <- simulate(flomodel.03, nsim=25)
+@
+
+<<setup3, include=FALSE>>=
+floplot <- plot(flomodel.03.sim[[1]])
+@
+
+The animated plot shows all 20 simulations of the graph with static node coordinates (code not shown). The animation options here are: a frame rate of 2 frames per second, no autoplay (you must press the play button), and no looping.
+
+<<fignet, fig.show='animate', interval=0.5, aniopts='controls', tidy=FALSE>>=
+par(mar=c(0,0,0,0))
+for (i in 1:length(flomodel.03.sim)){
+  plot(flomodel.03.sim[[i]], coord=floplot,
+       vertex.cex=sqrt(wealth)/2.5, vertex.col=pal[3])
+}
+@
+\bigskip
+
+\section{SIR Model}
+Here I set up a deterministic SIR model with births and deaths, solved with ordinary differential equations.
+
+<<sirsetup>>=
+library(deSolve)
+S <- 999
+I <- 1
+R <- 0
+N <- S+I+R
+
+cont <- 6
+beta <- 0.2
+lambda <- cont*beta/N
+
+v <- 0.3 # Recovery rate
+f <- 0.011 # Birth rate
+ms <- 0.01 # Death rate for S
+mi <- 0.02 # Death rate for I
+mr <- 0.01 # Death rate for R
+
+p <- c(beta=beta, cont=cont, v=v, f=f, ms=ms, mi=mi, mr=mr)
+t0 <- c(S=S, I=I, R=R, N=N)
+
+SIR <- function(t, t0, params) {
+  with(as.list(c(t0, p)), {		
+		dS <- -(cont*beta/N)*S*I + f*N - ms*S
+		dI <- (cont*beta/N)*S*I - v*I - mi*I
+		dR <- v*I - mr*R
+		dN <- f*N - ms*S - mi*I - mr*R	
+	list(c(dS, dI, dR, dN))
+	})
+}
+
+times <- seq(from=0, to=500, by=1)
+out <- data.frame(ode(y=t0, times=times, func=SIR, parms=p))
+times <- times+1
+@
+
+For the plot, it is necessary to index the time cumulatively to see the dynamics. The animation options are: a frame rate of 10 frames per second, no autoplay or looping, and wider dimensions for the plot. It is possible to step through the times manually with the plot buttons.
+
+<<figsir, fig.show='animate', interval=0.1, aniopts='controls', tidy=FALSE, fig.height=4.5, fig.width=7, out.width='1\\linewidth'>>=
+for (i in 1:max(times)){
+  plot(out$I[1:times[i]],type='l',col=pal[2], lwd=2,
+        ylab='' , xlab='Time',
+        ylim=c(0,round(max(out[,2:4]), -2)), xlim=c(0,max(times)), 
+        xaxs='i', yaxs='i', bty='n')
+  lines(out$S[1:times[i]], col=pal[1], lwd=2)
+  lines(out$R[1:times[i]], col=pal[3], lwd=2)
+  mtext(paste('Time =', times[i], sep=' '), 3, 
+        at=max(times)/3, cex=0.8)
+  mtext(paste(paste('Prev =', 
+                    100*round(out$I[times[i]]/(out$N[times[i]]), 4), sep=' '), 
+                    '%', sep=''), 3, 
+        at=max(times)/3*2, cex=0.8)
+  mtext(paste('N =', round(out$N[times[i]], 0), sep=' '), 
+        at=max(times)/2, cex=0.8) 
+  legend(max(times)-(0.10*max(times)), 700, legend=c('S','I','R'), 
+         bty='n', lty=1, lwd=2, col=c(pal[1:3]), cex=0.8)
+}
+@
+
+
+\end{document}
