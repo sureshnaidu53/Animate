@@ -35,7 +35,7 @@ library(statnet)
 \section{Linear Regression}
 
 This defines the values of $x$ and $y$, estimates the coefficents in a linear regression model, and simulates coefficients given the model using Gelman's \texttt{sim} function in the \texttt{arm} package. This is a nice way to see inferential uncertainty in the coefficients.
-
+ 
 <<reg, message=FALSE>>=
 x <- 1:100
 y <- 5*x + rnorm(length(x), 0, 200)
