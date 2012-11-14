@@ -40,7 +40,7 @@ This defines the values of $x$ and $y$, estimates the coefficents in a linear re
 x <- 1:100
 y <- 5*x + rnorm(length(x), 0, 200)
 mod <- lm(y ~ x)
-mod.sim <- sim(mod, n.sims=250)
+mod.sim <- sim(mod, n.sims=50)
 b <- coef(mod.sim)
 @
 
@@ -118,7 +118,7 @@ SIR <- function(t, t0, params) {
 	})
 }
 
-times <- seq(from=0, to=500, by=1)
+times <- seq(from=0, to=400, by=1)
 out <- data.frame(ode(y=t0, times=times, func=SIR, parms=p))
 times <- times+1
 @
